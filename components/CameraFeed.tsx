@@ -43,7 +43,7 @@ const CameraFeed = forwardRef<HTMLVideoElement>((props, ref) => {
       autoPlay
       playsInline
       muted
-      className="w-full h-full object-cover -scale-x-100"
+      className="h-full w-full object-cover -scale-x-100"
     />
   );
 });
