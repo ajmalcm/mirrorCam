@@ -6,11 +6,13 @@ import { useEffect, useRef } from "react";
 type CanvasFilterProps = {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   enabled: boolean;
+  mode: string | null;
 };
 
 const CanvasFilter = ({
   videoRef,
   enabled,
+  mode
 }: CanvasFilterProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -245,7 +247,110 @@ const CanvasFilter = ({
         requestAnimationFrame(drawAsciiFrame);
     };
 
-    drawAsciiFrame();
+    const drawPixelFrame = () => {
+  if (!isActive) {
+    return;
+  }
+
+  if (!video.videoWidth || !video.videoHeight) {
+    animationFrameId =
+      requestAnimationFrame(drawPixelFrame);
+
+    return;
+  }
+
+  const canvasWidth = 1000;
+
+  const canvasHeight = Math.floor(
+    (video.videoHeight / video.videoWidth) *
+      canvasWidth
+  );
+
+  canvas.width = canvasWidth;
+  canvas.height = canvasHeight;
+
+  /*
+    Size of each pixel block.
+
+    Increase this → chunkier pixels
+    Decrease this → more detailed image
+  */
+  const pixelSize = 12;
+
+  /*
+    Draw the camera frame normally first.
+  */
+  context.drawImage(
+    video,
+    0,
+    0,
+    canvasWidth,
+    canvasHeight
+  );
+
+  /*
+    Read all pixels from the canvas.
+  */
+  const imageData = context.getImageData(
+    0,
+    0,
+    canvasWidth,
+    canvasHeight
+  );
+
+  const pixels = imageData.data;
+
+  /*
+    Go through the image block-by-block.
+  */
+  for (
+    let y = 0;
+    y < canvasHeight;
+    y += pixelSize
+  ) {
+    for (
+      let x = 0;
+      x < canvasWidth;
+      x += pixelSize
+    ) {
+      /*
+        Find the pixel at the
+        top-left of this block.
+      */
+      const index =
+        (y * canvasWidth + x) * 4;
+
+      const r = pixels[index];
+      const g = pixels[index + 1];
+      const b = pixels[index + 2];
+
+      /*
+        Use this pixel's color
+        for the entire block.
+      */
+      context.fillStyle =
+        `rgb(${r}, ${g}, ${b})`;
+
+      context.fillRect(
+        x,
+        y,
+        pixelSize,
+        pixelSize
+      );
+    }
+  }
+
+  animationFrameId =
+    requestAnimationFrame(drawPixelFrame);
+};
+
+   if (mode === "ASCII CAM") {
+  drawAsciiFrame();
+}
+
+if (mode === "Pixel Cam") {
+  drawPixelFrame();
+}
 
     /*
       Cleanup when ASCII mode
@@ -258,7 +363,7 @@ const CanvasFilter = ({
         animationFrameId
       );
     };
-  }, [videoRef, enabled]);
+  }, [videoRef, enabled,mode]);
 
   return (
     <canvas

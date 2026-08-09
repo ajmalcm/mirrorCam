@@ -12,11 +12,12 @@ export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [gifUrl, setGifUrl] = useState<string | null>(null);
-  const [selectedNavItem, setSelectedNavItem] = useState<string | null>("Reactions");
+  const [selectedNavItem, setSelectedNavItem] = useState<string | null>(
+    "Reactions",
+  );
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
-
       {/* Header */}
       {/* <header className="pt-10 pb-8 text-center">
         <h1 className="text-5xl font-bold tracking-tight">
@@ -29,30 +30,22 @@ export default function Home() {
       </header> */}
 
       <section className="px-4">
-
         <div>
-
           {/* Camera Card */}
           <div className="relative overflow-hidden ">
-
             <div className="aspect-video bg-black">
-
               <CameraFeed ref={videoRef} />
-
-              {
-                selectedNavItem === "Reactions" && gifUrl &&
+              {selectedNavItem === "Reactions" && gifUrl && (
                 <GifOverlay gifUrl={gifUrl} />
-                }
-
-                {selectedNavItem == "ASCII CAM" && (
-    <CanvasFilter
-      videoRef={videoRef}
-      enabled={selectedNavItem === "ASCII CAM"}
-    />
-  )}
-
+              )}
+              {selectedNavItem !== "Reactions" && (
+                <CanvasFilter
+                  videoRef={videoRef}
+                  enabled={true}
+                  mode={selectedNavItem}
+                />
+              )}
             </div>
-
           </div>
 
           {/* Future Status Panel */}
@@ -107,21 +100,19 @@ export default function Home() {
             </div>
 
           </div> */}
-
         </div>
-
       </section>
 
-      
-        <ExpressionDetector
-  videoRef={videoRef}
-  setGifUrl={setGifUrl}
-  enabled={selectedNavItem === "Reactions"}
-/>
-      
+      <ExpressionDetector
+        videoRef={videoRef}
+        setGifUrl={setGifUrl}
+        enabled={selectedNavItem === "Reactions"}
+      />
 
-      <NavBar setSelectedNavItem={setSelectedNavItem} selectedNavItem={selectedNavItem} />
-
+      <NavBar
+        setSelectedNavItem={setSelectedNavItem}
+        selectedNavItem={selectedNavItem}
+      />
     </main>
   );
 }
