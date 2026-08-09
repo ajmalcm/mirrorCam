@@ -7,21 +7,44 @@ import { loadFaceApiModels } from "@/lib/faceApiLoader";
 type ExpressionDetectorProps = {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   setGifUrl?: React.Dispatch<React.SetStateAction<string | null>>;
+  enabled: boolean;
 };
 
-const ExpressionDetector = ({ videoRef, setGifUrl }: ExpressionDetectorProps) => {
+const ExpressionDetector = ({
+  videoRef,
+  setGifUrl,
+  enabled,
+}: ExpressionDetectorProps) => {
   const candidateExpression = useRef<string | null>(null);
-  const candidateStartTime = useRef<number>(0);
+  const candidateStartTime = useRef(0);
   const stableExpression = useRef<string | null>(null);
 
   useEffect(() => {
-    let animationFrameId: number;
+    // If Reaction mode is disabled,
+    // reset the previous detection session.
+    if (!enabled) {
+      candidateExpression.current = null;
+      candidateStartTime.current = 0;
+      stableExpression.current = null;
+
+      return;
+    }
+
+    let animationFrameId: number | null = null;
     let isDetecting = false;
+    let isActive = true;
 
     const initialize = async () => {
       try {
-        // Load the AI models
+        // Load Face API models
         await loadFaceApiModels();
+
+        // User may have switched modes
+        // while models were loading.
+        if (!isActive) {
+          return;
+        }
+
         console.log("Face API models loaded");
 
         const video = videoRef.current;
@@ -32,93 +55,178 @@ const ExpressionDetector = ({ videoRef, setGifUrl }: ExpressionDetectorProps) =>
         }
 
         const detectLoop = async () => {
-          // Prevent multiple detections running simultaneously
+          // Stop the loop if Reaction mode is no longer active.
+          if (!isActive) {
+            return;
+          }
+
+          // Prevent multiple face detections
+          // from running simultaneously.
           if (!isDetecting) {
             isDetecting = true;
 
             try {
               const result = await faceapi
-                .detectSingleFace(video, new faceapi.TinyFaceDetectorOptions())
+                .detectSingleFace(
+                  video,
+                  new faceapi.TinyFaceDetectorOptions()
+                )
                 .withFaceExpressions();
+
+              // The user may have switched modes
+              // while face detection was running.
+              if (!isActive) {
+                isDetecting = false;
+                return;
+              }
+
               if (result) {
                 const expressions = result.expressions;
 
-                // Find the expression with the highest confidence
-                const currentExpression = Object.entries(expressions).reduce(
-                  (highest, current) => {
-                    return current[1] > highest[1] ? current : highest;
-                  },
-                )[0];
+                // Find the expression with the highest confidence.
+                const currentExpression = Object.entries(
+                  expressions
+                ).reduce((highest, current) => {
+                  return current[1] > highest[1]
+                    ? current
+                    : highest;
+                })[0];
 
                 const now = Date.now();
 
-                // First time seeing an expression
+                // First time seeing an expression.
                 if (candidateExpression.current === null) {
-                  candidateExpression.current = currentExpression;
+                  candidateExpression.current =
+                    currentExpression;
+
                   candidateStartTime.current = now;
                 }
 
-                // Expression changed
-                else if (candidateExpression.current !== currentExpression) {
-                  candidateExpression.current = currentExpression;
+                // Expression changed.
+                else if (
+                  candidateExpression.current !==
+                  currentExpression
+                ) {
+                  candidateExpression.current =
+                    currentExpression;
+
                   candidateStartTime.current = now;
                 }
 
-                // Same expression continues
+                // Same expression continues.
                 else {
-                  const heldTime = now - candidateStartTime.current;
+                  const heldTime =
+                    now - candidateStartTime.current;
 
+                  // Expression has been held for 800ms
+                  // and hasn't already been processed.
                   if (
                     heldTime >= 800 &&
-                    stableExpression.current !== currentExpression
+                    stableExpression.current !==
+                      currentExpression
                   ) {
-                    stableExpression.current = currentExpression;
+                    stableExpression.current =
+                      currentExpression;
 
-                    console.clear();
-                    console.log("🎉 Stable Expression:", currentExpression);
-                    // Fetch GIF
-                    await fetch(`/api/gif-search?expression=${currentExpression}`)
-                      .then((response) => response.json())
-                      .then((data) => {
-                        if (data.gifUrl && setGifUrl) {
-                          setGifUrl(data.gifUrl);
-                        } else {
-                          console.error("No GIF URL found in response");
-                        }
-                      })
-                      .catch((error) => {
-                        console.error("Error fetching GIF:", error);
-                      });
+                    console.log(
+                      "🎉 Stable Expression:",
+                      currentExpression
+                    );
+
+                    // Make sure Reaction mode
+                    // is still active.
+                    if (!isActive) {
+                      isDetecting = false;
+                      return;
+                    }
+
+                    try {
+                      const response = await fetch(
+                        `/api/gif-search?expression=${currentExpression}`
+                      );
+
+                      const data = await response.json();
+
+                      // Don't update the UI if the user
+                      // switched modes while the request
+                      // was running.
+                      if (!isActive) {
+                        isDetecting = false;
+                        return;
+                      }
+
+                      if (data.gifUrl && setGifUrl) {
+                        setGifUrl(data.gifUrl);
+                      } else {
+                        console.error(
+                          "No GIF URL found in response"
+                        );
+                      }
+                    } catch (error) {
+                      if (isActive) {
+                        console.error(
+                          "Error fetching GIF:",
+                          error
+                        );
+                      }
+                    }
                   }
                 }
               } else {
-                console.clear();
                 console.log("🙈 No face detected");
               }
             } catch (error) {
-              console.error(error);
+              if (isActive) {
+                console.error(error);
+              }
             }
 
             isDetecting = false;
           }
 
-          animationFrameId = requestAnimationFrame(detectLoop);
+          // Continue the detection loop only
+          // while Reaction mode is active.
+          if (isActive) {
+            animationFrameId =
+              requestAnimationFrame(detectLoop);
+          }
         };
 
         const handlePlaying = () => {
+          if (!isActive) {
+            return;
+          }
+
           console.log("🎥 Camera started");
 
           detectLoop();
         };
 
-        video.addEventListener("playing", handlePlaying);
+        video.addEventListener(
+          "playing",
+          handlePlaying
+        );
 
+        // If the camera is already playing
+        // when the detector starts.
+        if (!video.paused) {
+          handlePlaying();
+        }
+
+        // Cleanup for the video event listener.
         return () => {
-          video.removeEventListener("playing", handlePlaying);
-          cancelAnimationFrame(animationFrameId);
+          video.removeEventListener(
+            "playing",
+            handlePlaying
+          );
         };
       } catch (error) {
-        console.error("Initialization failed:", error);
+        if (isActive) {
+          console.error(
+            "Initialization failed:",
+            error
+          );
+        }
       }
     };
 
@@ -128,11 +236,35 @@ const ExpressionDetector = ({ videoRef, setGifUrl }: ExpressionDetectorProps) =>
       cleanup = fn;
     });
 
+    // React cleanup.
     return () => {
-      cleanup?.();
-    };
-  }, [videoRef]);
+      console.log(
+        "🛑 Expression detection stopped"
+      );
 
+      // Kill switch for async operations
+      // and the detection loop.
+      isActive = false;
+
+      // Stop requestAnimationFrame.
+      if (animationFrameId !== null) {
+        cancelAnimationFrame(
+          animationFrameId
+        );
+      }
+
+      // Remove the video event listener.
+      cleanup?.();
+
+      // Reset detection state so that
+      // the next Reaction session starts fresh.
+      candidateExpression.current = null;
+      candidateStartTime.current = 0;
+      stableExpression.current = null;
+    };
+  }, [videoRef, enabled, setGifUrl]);
+
+  // This component only performs detection.
   return null;
 };
 

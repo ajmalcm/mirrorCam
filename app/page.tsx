@@ -5,11 +5,14 @@ import { useRef, useState } from "react";
 import CameraFeed from "@/components/CameraFeed";
 import ExpressionDetector from "@/components/ExpressionDetector";
 import GifOverlay from "@/components/GifOverlay";
+import NavBar from "@/components/NavBar";
+import CanvasFilter from "@/components/CanvasFilter";
 
 export default function Home() {
   const videoRef = useRef<HTMLVideoElement>(null);
 
   const [gifUrl, setGifUrl] = useState<string | null>(null);
+  const [selectedNavItem, setSelectedNavItem] = useState<string | null>("Reactions");
 
   return (
     <main className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
@@ -36,7 +39,17 @@ export default function Home() {
 
               <CameraFeed ref={videoRef} />
 
-              <GifOverlay gifUrl={gifUrl} />
+              {
+                selectedNavItem === "Reactions" && gifUrl &&
+                <GifOverlay gifUrl={gifUrl} />
+                }
+
+                {selectedNavItem == "ASCII CAM" && (
+    <CanvasFilter
+      videoRef={videoRef}
+      enabled={selectedNavItem === "ASCII CAM"}
+    />
+  )}
 
             </div>
 
@@ -99,10 +112,15 @@ export default function Home() {
 
       </section>
 
-      <ExpressionDetector
-        videoRef={videoRef}
-        setGifUrl={setGifUrl}
-      />
+      
+        <ExpressionDetector
+  videoRef={videoRef}
+  setGifUrl={setGifUrl}
+  enabled={selectedNavItem === "Reactions"}
+/>
+      
+
+      <NavBar setSelectedNavItem={setSelectedNavItem} selectedNavItem={selectedNavItem} />
 
     </main>
   );
