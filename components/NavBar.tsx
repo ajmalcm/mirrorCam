@@ -16,7 +16,7 @@ const NavBar = ({
   };
 
   return (
-    <nav className="flex items-center gap-2 rounded-xl bg-zinc-900/90 p-2 shadow-lg backdrop-blur-md">
+    <nav className="flex items-center gap-2 rounded-xl bg-transparent p-2 shadow-2xl backdrop-blur-md absolute bottom-10 left-1/2 z-20 -translate-x-1/2">
       {navItems.map((navItem) => (
         <button
           key={navItem}
@@ -26,8 +26,8 @@ const NavBar = ({
             transition-all duration-200
             ${
               selectedNavItem === navItem
-                ? "bg-purple-600 text-white shadow-md shadow-purple-500/30"
-                : "text-zinc-400 hover:bg-zinc-800 hover:text-white"
+                ? "bg-purple-600 text-black shadow-md shadow-purple-500/30"
+                : "text-zinc-600 hover:bg-zinc-800 hover:text-white"
             }
           `}
         >

@@ -17,20 +17,20 @@ type CanvasFilterProps = {
     characterSet: AsciiCharacterSet;
   };
 
-   pixelSettings: {
+  pixelSettings: {
     pixelSize: number;
     shape: "square" | "circle";
     gap: number;
+    brightness: number;
+    contrast: number;
   };
 };
-
 
 /*
   Different ASCII character sets.
 
   Dark → bright
 */
-
 const ASCII_CHARACTER_SETS: Record<
   AsciiCharacterSet,
   string
@@ -44,7 +44,6 @@ const ASCII_CHARACTER_SETS: Record<
     " .:-=+*#@",
 };
 
-
 const CanvasFilter = ({
   videoRef,
   enabled,
@@ -52,22 +51,17 @@ const CanvasFilter = ({
   asciiSettings,
   pixelSettings,
 }: CanvasFilterProps) => {
-
   const canvasRef =
     useRef<HTMLCanvasElement | null>(null);
 
-
   useEffect(() => {
-
     /*
-      If disabled, don't run
-      the canvas animation.
+      Don't run the canvas renderer
+      when the effect is disabled.
     */
-
     if (!enabled) {
       return;
     }
-
 
     const video =
       videoRef.current;
@@ -75,47 +69,136 @@ const CanvasFilter = ({
     const canvas =
       canvasRef.current;
 
-
     if (!video || !canvas) {
       return;
     }
 
-
     const context =
       canvas.getContext("2d");
-
 
     if (!context) {
       return;
     }
 
-
     let animationFrameId: number;
 
     let isActive = true;
 
-
     /*
-      IMPORTANT:
+      Sampling canvas.
 
-      Create the sampling canvas
-      only ONCE.
-
-      Previously we were creating
-      this on every frame.
+      We reuse this instead of creating
+      a new canvas on every frame.
     */
-
     const sampleCanvas =
       document.createElement("canvas");
 
     const sampleContext =
       sampleCanvas.getContext("2d");
 
-
     if (!sampleContext) {
       return;
     }
 
+    /*
+      ==================================
+      BRIGHTNESS + CONTRAST
+      ==================================
+    */
+
+    const clamp = (value: number) =>
+      Math.max(
+        0,
+        Math.min(255, value)
+      );
+
+    const adjustColor = (
+      r: number,
+      g: number,
+      b: number
+    ) => {
+      /*
+        ------------------------------
+        Brightness
+        ------------------------------
+
+        -100 = darker
+         0   = original
+        +100 = brighter
+      */
+
+      let adjustedR =
+        r + pixelSettings.brightness;
+
+      let adjustedG =
+        g + pixelSettings.brightness;
+
+      let adjustedB =
+        b + pixelSettings.brightness;
+
+      /*
+        Clamp brightness.
+      */
+
+      adjustedR =
+        clamp(adjustedR);
+
+      adjustedG =
+        clamp(adjustedG);
+
+      adjustedB =
+        clamp(adjustedB);
+
+      /*
+        ------------------------------
+        Contrast
+        ------------------------------
+
+        -100 = low contrast
+         0   = original
+        +100 = high contrast
+      */
+
+      const factor =
+        (259 *
+          (pixelSettings.contrast + 255)) /
+        (255 *
+          (259 - pixelSettings.contrast));
+
+      adjustedR =
+        factor *
+          (adjustedR - 128) +
+        128;
+
+      adjustedG =
+        factor *
+          (adjustedG - 128) +
+        128;
+
+      adjustedB =
+        factor *
+          (adjustedB - 128) +
+        128;
+
+      /*
+        Clamp contrast result.
+      */
+
+      adjustedR =
+        clamp(adjustedR);
+
+      adjustedG =
+        clamp(adjustedG);
+
+      adjustedB =
+        clamp(adjustedB);
+
+      return {
+        r: adjustedR,
+        g: adjustedG,
+        b: adjustedB,
+      };
+    };
 
     /*
       ============================
@@ -124,22 +207,18 @@ const CanvasFilter = ({
     */
 
     const drawAsciiFrame = () => {
-
       if (!isActive) {
         return;
       }
 
-
       /*
-        Wait until camera dimensions
-        are available.
+        Wait for camera dimensions.
       */
 
       if (
         !video.videoWidth ||
         !video.videoHeight
       ) {
-
         animationFrameId =
           requestAnimationFrame(
             drawAsciiFrame
@@ -148,12 +227,8 @@ const CanvasFilter = ({
         return;
       }
 
-
       /*
-        Get current settings.
-
-        These values come from React
-        state.
+        Get ASCII settings.
       */
 
       const columns =
@@ -164,9 +239,8 @@ const CanvasFilter = ({
           asciiSettings.characterSet
         ];
 
-
       /*
-        Main canvas resolution.
+        Main canvas.
       */
 
       const canvasWidth = 1000;
@@ -178,18 +252,16 @@ const CanvasFilter = ({
             canvasWidth
         );
 
-
       canvas.width =
         canvasWidth;
 
       canvas.height =
         canvasHeight;
 
-
       /*
         Calculate ASCII rows.
 
-        The 0.5 compensates for the
+        0.5 compensates for the
         rectangular shape of characters.
       */
 
@@ -201,7 +273,6 @@ const CanvasFilter = ({
             0.5
         );
 
-
       /*
         Resize sampling canvas.
       */
@@ -212,19 +283,9 @@ const CanvasFilter = ({
       sampleCanvas.height =
         rows;
 
-
       /*
-        Draw camera into tiny canvas.
-
-        Example:
-
-        Camera
-        1280 × 720
-
-        ↓
-
-        ASCII grid
-        160 × ~45
+        Draw camera into small
+        sampling canvas.
       */
 
       sampleContext.drawImage(
@@ -235,9 +296,8 @@ const CanvasFilter = ({
         rows
       );
 
-
       /*
-        Get pixel information.
+        Read pixels.
       */
 
       const imageData =
@@ -248,13 +308,11 @@ const CanvasFilter = ({
           rows
         );
 
-
       const pixels =
         imageData.data;
 
-
       /*
-        Clear main canvas.
+        Clear canvas.
       */
 
       context.fillStyle =
@@ -267,10 +325,8 @@ const CanvasFilter = ({
         canvasHeight
       );
 
-
       /*
-        Calculate size of each
-        ASCII cell.
+        ASCII cell dimensions.
       */
 
       const cellWidth =
@@ -281,15 +337,8 @@ const CanvasFilter = ({
         canvasHeight /
         rows;
 
-
-      /*
-        Font size follows the
-        cell height.
-      */
-
       const fontSize =
         cellHeight * 0.9;
-
 
       context.font =
         `${fontSize}px monospace`;
@@ -297,10 +346,8 @@ const CanvasFilter = ({
       context.textBaseline =
         "top";
 
-
       /*
-        Convert every sampled pixel
-        into one character.
+        Convert pixels → ASCII.
       */
 
       for (
@@ -308,16 +355,13 @@ const CanvasFilter = ({
         y < rows;
         y++
       ) {
-
         for (
           let x = 0;
           x < columns;
           x++
         ) {
-
           const index =
             (y * columns + x) * 4;
-
 
           const r =
             pixels[index];
@@ -328,19 +372,14 @@ const CanvasFilter = ({
           const b =
             pixels[index + 2];
 
-
           /*
-            Convert RGB → brightness.
-
-            0   = black
-            255 = white
+            RGB → brightness.
           */
 
           const brightness =
             0.299 * r +
             0.587 * g +
             0.114 * b;
-
 
           /*
             Brightness → character.
@@ -352,21 +391,17 @@ const CanvasFilter = ({
                 (characters.length - 1)
             );
 
-
           const character =
             characters[
               characterIndex
             ];
 
-
           /*
-            Keep original camera
-            color.
+            Keep original color.
           */
 
           context.fillStyle =
             `rgb(${r}, ${g}, ${b})`;
-
 
           /*
             Draw character.
@@ -377,11 +412,8 @@ const CanvasFilter = ({
             x * cellWidth,
             y * cellHeight
           );
-
         }
-
       }
-
 
       /*
         Next frame.
@@ -393,7 +425,6 @@ const CanvasFilter = ({
         );
     };
 
-
     /*
       ============================
       PIXEL
@@ -401,17 +432,18 @@ const CanvasFilter = ({
     */
 
     const drawPixelFrame = () => {
-
       if (!isActive) {
         return;
       }
 
+      /*
+        Wait for camera dimensions.
+      */
 
       if (
         !video.videoWidth ||
         !video.videoHeight
       ) {
-
         animationFrameId =
           requestAnimationFrame(
             drawPixelFrame
@@ -420,6 +452,9 @@ const CanvasFilter = ({
         return;
       }
 
+      /*
+        Main canvas.
+      */
 
       const canvasWidth = 1000;
 
@@ -430,16 +465,18 @@ const CanvasFilter = ({
             canvasWidth
         );
 
-
       canvas.width =
         canvasWidth;
 
       canvas.height =
         canvasHeight;
 
+      /*
+        Pixel size.
+      */
 
-      const pixelSize = pixelSettings.pixelSize;
-
+      const pixelSize =
+        pixelSettings.pixelSize;
 
       /*
         Draw normal camera frame.
@@ -453,9 +490,8 @@ const CanvasFilter = ({
         canvasHeight
       );
 
-
       /*
-        Get pixel information.
+        Read camera pixels.
       */
 
       const imageData =
@@ -466,13 +502,11 @@ const CanvasFilter = ({
           canvasHeight
         );
 
-
       const pixels =
         imageData.data;
 
-
       /*
-        Turn image into blocks.
+        Draw pixel blocks.
       */
 
       for (
@@ -480,16 +514,18 @@ const CanvasFilter = ({
         y < canvasHeight;
         y += pixelSize
       ) {
-
         for (
           let x = 0;
           x < canvasWidth;
           x += pixelSize
         ) {
+          /*
+            Find the pixel at
+            the top-left of the block.
+          */
 
           const index =
             (y * canvasWidth + x) * 4;
-
 
           const r =
             pixels[index];
@@ -500,39 +536,93 @@ const CanvasFilter = ({
           const b =
             pixels[index + 2];
 
+          /*
+            Apply brightness
+            and contrast.
+          */
+
+          const adjusted =
+            adjustColor(
+              r,
+              g,
+              b
+            );
+
+          /*
+            Use adjusted color.
+          */
 
           context.fillStyle =
-            `rgb(${r}, ${g}, ${b})`;
+            `rgb(
+              ${adjusted.r},
+              ${adjusted.g},
+              ${adjusted.b}
+            )`;
 
+          /*
+            Gap between pixels.
+          */
 
-          const drawSize = pixelSize - pixelSettings.gap;
-          if (pixelSettings.shape === "square") {
-  context.fillRect(
-    x + pixelSettings.gap / 2,
-    y + pixelSettings.gap / 2,
-    drawSize,
-    drawSize
-  );
-}
+          const drawSize =
+            Math.max(
+              1,
+              pixelSize -
+                pixelSettings.gap
+            );
 
-if (pixelSettings.shape === "circle") {
-  context.beginPath();
+          /*
+            =========================
+            SQUARE
+            =========================
+          */
 
-  context.arc(
-    x + pixelSize / 2,
-    y + pixelSize / 2,
-    drawSize / 2,
-    0,
-    Math.PI * 2
-  );
+          if (
+            pixelSettings.shape ===
+            "square"
+          ) {
+            context.fillRect(
+              x +
+                pixelSettings.gap /
+                  2,
 
-  context.fill();
-}
+              y +
+                pixelSettings.gap /
+                  2,
 
+              drawSize,
+              drawSize
+            );
+          }
+
+          /*
+            =========================
+            CIRCLE
+            =========================
+          */
+
+          if (
+            pixelSettings.shape ===
+            "circle"
+          ) {
+            context.beginPath();
+
+            context.arc(
+              x +
+                pixelSize / 2,
+
+              y +
+                pixelSize / 2,
+
+              drawSize / 2,
+
+              0,
+              Math.PI * 2
+            );
+
+            context.fill();
+          }
         }
-
       }
-
 
       /*
         Next frame.
@@ -544,7 +634,6 @@ if (pixelSettings.shape === "circle") {
         );
     };
 
-
     /*
       ============================
       START EFFECT
@@ -554,20 +643,14 @@ if (pixelSettings.shape === "circle") {
     if (
       mode === "ASCII CAM"
     ) {
-
       drawAsciiFrame();
-
     }
-
 
     if (
       mode === "Pixel Cam"
     ) {
-
       drawPixelFrame();
-
     }
-
 
     /*
       ============================
@@ -576,17 +659,11 @@ if (pixelSettings.shape === "circle") {
     */
 
     return () => {
-
       isActive = false;
 
       cancelAnimationFrame(
         animationFrameId
       );
-
-      /*
-        Clear canvas when effect
-        is stopped.
-      */
 
       context.clearRect(
         0,
@@ -594,7 +671,6 @@ if (pixelSettings.shape === "circle") {
         canvas.width,
         canvas.height
       );
-
     };
 
   }, [
@@ -602,17 +678,28 @@ if (pixelSettings.shape === "circle") {
     enabled,
     mode,
     asciiSettings,
-    pixelSettings
+    pixelSettings,
   ]);
 
+  /*
+    Canvas element.
+
+    CameraFeed remains underneath it.
+  */
 
   return (
     <canvas
       ref={canvasRef}
-      className="absolute inset-0 h-full w-full -scale-x-100"
+      className="
+        absolute
+        inset-0
+        h-full
+        w-full
+        object-cover
+        -scale-x-100
+      "
     />
   );
 };
-
 
 export default CanvasFilter;
