@@ -1,131 +1,232 @@
-
 "use client";
 
 import { useEffect, useRef } from "react";
+
+type AsciiCharacterSet =
+  | "classic"
+  | "dense"
+  | "simple";
 
 type CanvasFilterProps = {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   enabled: boolean;
   mode: string | null;
+
+  asciiSettings: {
+    columns: number;
+    characterSet: AsciiCharacterSet;
+  };
+
+   pixelSettings: {
+    pixelSize: number;
+    shape: "square" | "circle";
+    gap: number;
+  };
 };
+
+
+/*
+  Different ASCII character sets.
+
+  Dark → bright
+*/
+
+const ASCII_CHARACTER_SETS: Record<
+  AsciiCharacterSet,
+  string
+> = {
+  classic: " .:-=+*#%@",
+
+  dense:
+    " .,:;irsXA253hMHGS#9B&@",
+
+  simple:
+    " .:-=+*#@",
+};
+
 
 const CanvasFilter = ({
   videoRef,
   enabled,
-  mode
+  mode,
+  asciiSettings,
+  pixelSettings,
 }: CanvasFilterProps) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  const canvasRef =
+    useRef<HTMLCanvasElement | null>(null);
+
 
   useEffect(() => {
+
+    /*
+      If disabled, don't run
+      the canvas animation.
+    */
+
     if (!enabled) {
       return;
     }
 
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
+
+    const video =
+      videoRef.current;
+
+    const canvas =
+      canvasRef.current;
+
 
     if (!video || !canvas) {
       return;
     }
 
-    const context = canvas.getContext("2d");
+
+    const context =
+      canvas.getContext("2d");
+
 
     if (!context) {
       return;
     }
 
+
     let animationFrameId: number;
+
     let isActive = true;
 
-    /*
-      These control the ASCII resolution.
-
-      More columns = more detail.
-      Fewer columns = bigger ASCII characters.
-
-      Start with 100.
-    */
-    const columns = 160;
 
     /*
-      ASCII characters from dark → bright.
+      IMPORTANT:
 
-      Using a longer character set gives
-      us smoother visual transitions.
+      Create the sampling canvas
+      only ONCE.
+
+      Previously we were creating
+      this on every frame.
     */
-    const characters =
-      " .,:;irsXA253hMHGS#9B&@";
+
+    const sampleCanvas =
+      document.createElement("canvas");
+
+    const sampleContext =
+      sampleCanvas.getContext("2d");
+
+
+    if (!sampleContext) {
+      return;
+    }
+
+
+    /*
+      ============================
+      ASCII
+      ============================
+    */
 
     const drawAsciiFrame = () => {
+
       if (!isActive) {
         return;
       }
 
-      if (!video.videoWidth || !video.videoHeight) {
+
+      /*
+        Wait until camera dimensions
+        are available.
+      */
+
+      if (
+        !video.videoWidth ||
+        !video.videoHeight
+      ) {
+
         animationFrameId =
-          requestAnimationFrame(drawAsciiFrame);
+          requestAnimationFrame(
+            drawAsciiFrame
+          );
 
         return;
       }
 
+
       /*
-        The actual canvas should match
-        the camera aspect ratio.
+        Get current settings.
 
-        We're NOT making the canvas
-        100 pixels wide.
-
-        100 is only our ASCII grid.
+        These values come from React
+        state.
       */
+
+      const columns =
+        asciiSettings.columns;
+
+      const characters =
+        ASCII_CHARACTER_SETS[
+          asciiSettings.characterSet
+        ];
+
+
+      /*
+        Main canvas resolution.
+      */
+
       const canvasWidth = 1000;
 
-      const canvasHeight = Math.floor(
-        (video.videoHeight / video.videoWidth) *
-          canvasWidth
-      );
-
-      canvas.width = canvasWidth;
-      canvas.height = canvasHeight;
-
-      /*
-        We create a temporary small canvas.
-
-        This is where we reduce the camera
-        to our ASCII resolution.
-      */
-      const sampleCanvas =
-        document.createElement("canvas");
-
-      const rows = Math.floor(
-        columns *
+      const canvasHeight =
+        Math.floor(
           (video.videoHeight /
             video.videoWidth) *
-          0.5
-      );
+            canvasWidth
+        );
 
-      sampleCanvas.width = columns;
-      sampleCanvas.height = rows;
 
-      const sampleContext =
-        sampleCanvas.getContext("2d");
+      canvas.width =
+        canvasWidth;
 
-      if (!sampleContext) {
-        return;
-      }
+      canvas.height =
+        canvasHeight;
+
 
       /*
-        Draw the camera into the small
-        sampling canvas.
+        Calculate ASCII rows.
+
+        The 0.5 compensates for the
+        rectangular shape of characters.
+      */
+
+      const rows =
+        Math.floor(
+          columns *
+            (video.videoHeight /
+              video.videoWidth) *
+            0.5
+        );
+
+
+      /*
+        Resize sampling canvas.
+      */
+
+      sampleCanvas.width =
+        columns;
+
+      sampleCanvas.height =
+        rows;
+
+
+      /*
+        Draw camera into tiny canvas.
 
         Example:
 
-        Camera:
+        Camera
         1280 × 720
 
-        becomes:
+        ↓
 
-        100 × ~28
+        ASCII grid
+        160 × ~45
       */
+
       sampleContext.drawImage(
         video,
         0,
@@ -134,9 +235,11 @@ const CanvasFilter = ({
         rows
       );
 
+
       /*
-        Get the reduced image pixels.
+        Get pixel information.
       */
+
       const imageData =
         sampleContext.getImageData(
           0,
@@ -145,12 +248,17 @@ const CanvasFilter = ({
           rows
         );
 
-      const pixels = imageData.data;
+
+      const pixels =
+        imageData.data;
+
 
       /*
-        Clear the main canvas.
+        Clear main canvas.
       */
-      context.fillStyle = "black";
+
+      context.fillStyle =
+        "black";
 
       context.fillRect(
         0,
@@ -159,41 +267,67 @@ const CanvasFilter = ({
         canvasHeight
       );
 
-      /*
-        Calculate the size of each
-        ASCII character.
 
-        Every sampled pixel becomes
-        one character.
+      /*
+        Calculate size of each
+        ASCII cell.
       */
+
       const cellWidth =
-        canvasWidth / columns;
+        canvasWidth /
+        columns;
 
       const cellHeight =
-        canvasHeight / rows;
+        canvasHeight /
+        rows;
+
 
       /*
-        Use a monospace font so every
-        character occupies the same width.
+        Font size follows the
+        cell height.
       */
+
       const fontSize =
         cellHeight * 0.9;
 
-      context.font = `${fontSize}px monospace`;
 
-      context.textBaseline = "top";
+      context.font =
+        `${fontSize}px monospace`;
+
+      context.textBaseline =
+        "top";
+
 
       /*
-        Loop through our ASCII grid.
+        Convert every sampled pixel
+        into one character.
       */
-      for (let y = 0; y < rows; y++) {
-        for (let x = 0; x < columns; x++) {
+
+      for (
+        let y = 0;
+        y < rows;
+        y++
+      ) {
+
+        for (
+          let x = 0;
+          x < columns;
+          x++
+        ) {
+
           const index =
             (y * columns + x) * 4;
 
-          const r = pixels[index];
-          const g = pixels[index + 1];
-          const b = pixels[index + 2];
+
+          const r =
+            pixels[index];
+
+          const g =
+            pixels[index + 1];
+
+          const b =
+            pixels[index + 2];
+
 
           /*
             Convert RGB → brightness.
@@ -201,169 +335,276 @@ const CanvasFilter = ({
             0   = black
             255 = white
           */
+
           const brightness =
             0.299 * r +
             0.587 * g +
             0.114 * b;
 
+
           /*
-            Convert brightness into
-            an ASCII character.
+            Brightness → character.
           */
+
           const characterIndex =
             Math.floor(
               (brightness / 255) *
                 (characters.length - 1)
             );
 
+
           const character =
-            characters[characterIndex];
+            characters[
+              characterIndex
+            ];
+
 
           /*
-            Use the original camera
-            color for the ASCII character.
-
-            This makes the ASCII camera
-            much more visually interesting.
+            Keep original camera
+            color.
           */
+
           context.fillStyle =
             `rgb(${r}, ${g}, ${b})`;
 
+
           /*
-            Draw the character.
+            Draw character.
           */
+
           context.fillText(
             character,
             x * cellWidth,
             y * cellHeight
           );
+
         }
+
       }
 
+
       /*
-        Request the next camera frame.
+        Next frame.
       */
+
       animationFrameId =
-        requestAnimationFrame(drawAsciiFrame);
+        requestAnimationFrame(
+          drawAsciiFrame
+        );
     };
 
-    const drawPixelFrame = () => {
-  if (!isActive) {
-    return;
-  }
-
-  if (!video.videoWidth || !video.videoHeight) {
-    animationFrameId =
-      requestAnimationFrame(drawPixelFrame);
-
-    return;
-  }
-
-  const canvasWidth = 1000;
-
-  const canvasHeight = Math.floor(
-    (video.videoHeight / video.videoWidth) *
-      canvasWidth
-  );
-
-  canvas.width = canvasWidth;
-  canvas.height = canvasHeight;
-
-  /*
-    Size of each pixel block.
-
-    Increase this → chunkier pixels
-    Decrease this → more detailed image
-  */
-  const pixelSize = 12;
-
-  /*
-    Draw the camera frame normally first.
-  */
-  context.drawImage(
-    video,
-    0,
-    0,
-    canvasWidth,
-    canvasHeight
-  );
-
-  /*
-    Read all pixels from the canvas.
-  */
-  const imageData = context.getImageData(
-    0,
-    0,
-    canvasWidth,
-    canvasHeight
-  );
-
-  const pixels = imageData.data;
-
-  /*
-    Go through the image block-by-block.
-  */
-  for (
-    let y = 0;
-    y < canvasHeight;
-    y += pixelSize
-  ) {
-    for (
-      let x = 0;
-      x < canvasWidth;
-      x += pixelSize
-    ) {
-      /*
-        Find the pixel at the
-        top-left of this block.
-      */
-      const index =
-        (y * canvasWidth + x) * 4;
-
-      const r = pixels[index];
-      const g = pixels[index + 1];
-      const b = pixels[index + 2];
-
-      /*
-        Use this pixel's color
-        for the entire block.
-      */
-      context.fillStyle =
-        `rgb(${r}, ${g}, ${b})`;
-
-      context.fillRect(
-        x,
-        y,
-        pixelSize,
-        pixelSize
-      );
-    }
-  }
-
-  animationFrameId =
-    requestAnimationFrame(drawPixelFrame);
-};
-
-   if (mode === "ASCII CAM") {
-  drawAsciiFrame();
-}
-
-if (mode === "Pixel Cam") {
-  drawPixelFrame();
-}
 
     /*
-      Cleanup when ASCII mode
-      is disabled.
+      ============================
+      PIXEL
+      ============================
     */
+
+    const drawPixelFrame = () => {
+
+      if (!isActive) {
+        return;
+      }
+
+
+      if (
+        !video.videoWidth ||
+        !video.videoHeight
+      ) {
+
+        animationFrameId =
+          requestAnimationFrame(
+            drawPixelFrame
+          );
+
+        return;
+      }
+
+
+      const canvasWidth = 1000;
+
+      const canvasHeight =
+        Math.floor(
+          (video.videoHeight /
+            video.videoWidth) *
+            canvasWidth
+        );
+
+
+      canvas.width =
+        canvasWidth;
+
+      canvas.height =
+        canvasHeight;
+
+
+      const pixelSize = pixelSettings.pixelSize;
+
+
+      /*
+        Draw normal camera frame.
+      */
+
+      context.drawImage(
+        video,
+        0,
+        0,
+        canvasWidth,
+        canvasHeight
+      );
+
+
+      /*
+        Get pixel information.
+      */
+
+      const imageData =
+        context.getImageData(
+          0,
+          0,
+          canvasWidth,
+          canvasHeight
+        );
+
+
+      const pixels =
+        imageData.data;
+
+
+      /*
+        Turn image into blocks.
+      */
+
+      for (
+        let y = 0;
+        y < canvasHeight;
+        y += pixelSize
+      ) {
+
+        for (
+          let x = 0;
+          x < canvasWidth;
+          x += pixelSize
+        ) {
+
+          const index =
+            (y * canvasWidth + x) * 4;
+
+
+          const r =
+            pixels[index];
+
+          const g =
+            pixels[index + 1];
+
+          const b =
+            pixels[index + 2];
+
+
+          context.fillStyle =
+            `rgb(${r}, ${g}, ${b})`;
+
+
+          const drawSize = pixelSize - pixelSettings.gap;
+          if (pixelSettings.shape === "square") {
+  context.fillRect(
+    x + pixelSettings.gap / 2,
+    y + pixelSettings.gap / 2,
+    drawSize,
+    drawSize
+  );
+}
+
+if (pixelSettings.shape === "circle") {
+  context.beginPath();
+
+  context.arc(
+    x + pixelSize / 2,
+    y + pixelSize / 2,
+    drawSize / 2,
+    0,
+    Math.PI * 2
+  );
+
+  context.fill();
+}
+
+        }
+
+      }
+
+
+      /*
+        Next frame.
+      */
+
+      animationFrameId =
+        requestAnimationFrame(
+          drawPixelFrame
+        );
+    };
+
+
+    /*
+      ============================
+      START EFFECT
+      ============================
+    */
+
+    if (
+      mode === "ASCII CAM"
+    ) {
+
+      drawAsciiFrame();
+
+    }
+
+
+    if (
+      mode === "Pixel Cam"
+    ) {
+
+      drawPixelFrame();
+
+    }
+
+
+    /*
+      ============================
+      CLEANUP
+      ============================
+    */
+
     return () => {
+
       isActive = false;
 
       cancelAnimationFrame(
         animationFrameId
       );
+
+      /*
+        Clear canvas when effect
+        is stopped.
+      */
+
+      context.clearRect(
+        0,
+        0,
+        canvas.width,
+        canvas.height
+      );
+
     };
-  }, [videoRef, enabled,mode]);
+
+  }, [
+    videoRef,
+    enabled,
+    mode,
+    asciiSettings,
+    pixelSettings
+  ]);
+
 
   return (
     <canvas
@@ -372,5 +613,6 @@ if (mode === "Pixel Cam") {
     />
   );
 };
+
 
 export default CanvasFilter;
