@@ -17,7 +17,7 @@ export default function Home() {
   const [gifUrl, setGifUrl] = useState<string | null>(null);
 
   const [selectedNavItem, setSelectedNavItem] = useState<string | null>(
-    "Reactions",
+    "ASCII CAM",
   );
 
   const [asciiSettings, setAsciiSettings] = useState<{
@@ -37,6 +37,26 @@ export default function Home() {
     brightness: 0,
     contrast: 0,
   });
+
+  type ColorMode =
+  | "original"
+  | "bw"
+  | "monochrome";
+
+const [colorSettings, setColorSettings] = useState<{
+  mode: ColorMode;
+  color: string;
+}>({
+  mode: "original",
+  color: "#ffffff",
+});
+
+const [glitchSettings, setGlitchSettings] = useState({
+  rgbSplit: 12,
+  intensity: 50,
+  slices: 8,
+  sliceSize: 30,
+});
 
   return (
     <main className="h-screen bg-black text-white relative">
@@ -62,6 +82,8 @@ export default function Home() {
                   mode={selectedNavItem}
                   asciiSettings={asciiSettings}
                   pixelSettings={pixelSettings}
+                  colorSettings={colorSettings}
+                  glitchSettings={glitchSettings}
                 />
               )}
 
@@ -71,6 +93,10 @@ export default function Home() {
                 setAsciiSettings={setAsciiSettings}
                 pixelSettings={pixelSettings}
                 setPixelSettings={setPixelSettings}
+                colorSettings={colorSettings}
+                setColorSettings={setColorSettings}
+                glitchSettings={glitchSettings}
+                setGlitchSettings={setGlitchSettings}
               />
             </div>
           </div>

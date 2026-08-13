@@ -9,7 +9,7 @@ const NavBar = ({
   setSelectedNavItem: React.Dispatch<React.SetStateAction<string | null>>;
   selectedNavItem: string | null;
 }) => {
-  const navItems = ["Reactions", "ASCII CAM", "Pixel Cam", "Glitch"];
+  const navItems = ["ASCII CAM", "Pixel Cam", "Glitch"];//add reaction if needed only in local mode
 
   const handleItemClick = (item: string) => {
     setSelectedNavItem(item);

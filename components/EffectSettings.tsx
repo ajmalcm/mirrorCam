@@ -7,18 +7,21 @@ type AsciiCharacterSet =
   | "dense"
   | "simple";
 
+
+  type ColorMode = "original" | "bw" | "monochrome";
+
 type EffectSettingsProps = {
   mode: string | null;
 
   asciiSettings: {
     columns: number;
-    characterSet: AsciiCharacterSet;
+    characterSet: "classic" | "dense" | "simple";
   };
 
   setAsciiSettings: React.Dispatch<
     React.SetStateAction<{
       columns: number;
-      characterSet: AsciiCharacterSet;
+      characterSet: "classic" | "dense" | "simple";
     }>
   >;
 
@@ -26,8 +29,6 @@ type EffectSettingsProps = {
     pixelSize: number;
     shape: "square" | "circle";
     gap: number;
-    brightness: number;
-    contrast: number;
   };
 
   setPixelSettings: React.Dispatch<
@@ -39,7 +40,40 @@ type EffectSettingsProps = {
       contrast: number;
     }>
   >;
+
+  colorSettings: {
+    mode: ColorMode;
+    color: string;
+  };
+
+  setColorSettings: React.Dispatch<
+    React.SetStateAction<{
+      mode: ColorMode;
+      color: string;
+    }>
+  >;
+
+  glitchSettings: {
+    rgbSplit: number;
+    intensity: number;
+    slices: number;
+    sliceSize: number;
+    // sliceIntensity: number;
+    // frequency: number;
+    // scanlines: boolean;
+    // noise: number;
+  };
+
+  setGlitchSettings: React.Dispatch<
+    React.SetStateAction<{
+      rgbSplit: number;
+      slices: number;
+      sliceSize: number;
+      intensity: number;
+    }>
+  >;
 };
+
 
 const EffectSettings = ({
   mode,
@@ -47,6 +81,10 @@ const EffectSettings = ({
   setAsciiSettings,
   pixelSettings,
   setPixelSettings,
+  colorSettings,
+  setColorSettings,
+  glitchSettings,
+  setGlitchSettings,
 }: EffectSettingsProps) => {
 
   /*
@@ -63,7 +101,8 @@ const EffectSettings = ({
 
   if (
     mode !== "ASCII CAM" &&
-    mode !== "Pixel Cam"
+    mode !== "Pixel Cam" &&
+    mode !== "Glitch"
   ) {
     return null;
   }
@@ -361,6 +400,199 @@ const EffectSettings = ({
 
             </div>
           )}
+
+          {/* GLITCH SETTINGS */}
+          {mode === "Glitch" && (
+  <div className="space-y-6">
+
+    <h2 className="text-lg font-semibold text-white">
+      ⚡ Glitch Settings
+    </h2>
+
+    {/* RGB Split */}
+    <div>
+      <div className="mb-2 flex justify-between">
+        <label className="text-sm text-zinc-300">
+          RGB Split
+        </label>
+
+        <span className="text-sm text-zinc-500">
+          {glitchSettings.rgbSplit}px
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min="0"
+        max="40"
+        value={glitchSettings.rgbSplit}
+        onChange={(e) =>
+          setGlitchSettings((prev) => ({
+            ...prev,
+            rgbSplit: Number(e.target.value),
+          }))
+        }
+        className="w-full"
+      />
+    </div>
+
+    {/* Intensity */}
+    <div>
+      <div className="mb-2 flex justify-between">
+        <label className="text-sm text-zinc-300">
+          Intensity
+        </label>
+
+        <span className="text-sm text-zinc-500">
+          {glitchSettings.intensity}%
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min="0"
+        max="100"
+        value={glitchSettings.intensity}
+        onChange={(e) =>
+          setGlitchSettings((prev) => ({
+            ...prev,
+            intensity: Number(e.target.value),
+          }))
+        }
+        className="w-full"
+      />
+    </div>
+
+    {/* Number of slices */}
+    <div>
+      <div className="mb-2 flex justify-between">
+        <label className="text-sm text-zinc-300">
+          Slices
+        </label>
+
+        <span className="text-sm text-zinc-500">
+          {glitchSettings.slices}
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min="1"
+        max="30"
+        value={glitchSettings.slices}
+        onChange={(e) =>
+          setGlitchSettings((prev) => ({
+            ...prev,
+            slices: Number(e.target.value),
+          }))
+        }
+        className="w-full"
+      />
+    </div>
+
+    {/* Slice Size */}
+    <div>
+      <div className="mb-2 flex justify-between">
+        <label className="text-sm text-zinc-300">
+          Slice Size
+        </label>
+
+        <span className="text-sm text-zinc-500">
+          {glitchSettings.sliceSize}px
+        </span>
+      </div>
+
+      <input
+        type="range"
+        min="2"
+        max="100"
+        value={glitchSettings.sliceSize}
+        onChange={(e) =>
+          setGlitchSettings((prev) => ({
+            ...prev,
+            sliceSize: Number(e.target.value),
+          }))
+        }
+        className="w-full"
+      />
+    </div>
+
+  </div>
+)}
+
+          {/* COLOR SETTINGS */}
+
+<div className="mt-6 border-t border-white/10 pt-6">
+
+  <h3 className="mb-4 text-sm font-semibold text-white">
+    Color
+  </h3>
+
+  {/* Color Mode */}
+
+  <div>
+    <label className="mb-2 block text-sm text-zinc-300">
+      Color Mode
+    </label>
+
+    <select
+      value={colorSettings.mode}
+      onChange={(e) =>
+        setColorSettings((prev) => ({
+          ...prev,
+          mode: e.target.value as ColorMode,
+        }))
+      }
+      className="w-full rounded-lg border border-white/10 bg-zinc-900 px-3 py-2 text-sm text-white outline-none"
+    >
+      <option value="original">
+        Original
+      </option>
+
+      <option value="bw">
+        Black & White
+      </option>
+
+      <option value="monochrome">
+        Monochrome
+      </option>
+    </select>
+  </div>
+
+
+  {/* Color Picker */}
+
+  {colorSettings.mode === "monochrome" && (
+    <div className="mt-4">
+
+      <label className="mb-2 block text-sm text-zinc-300">
+        Color
+      </label>
+
+      <div className="flex items-center gap-3">
+
+        <input
+          type="color"
+          value={colorSettings.color}
+          onChange={(e) =>
+            setColorSettings((prev) => ({
+              ...prev,
+              color: e.target.value,
+            }))
+          }
+          className="h-10 w-14 cursor-pointer rounded-lg border border-white/10 bg-transparent"
+        />
+
+        <span className="text-sm text-zinc-400">
+          {colorSettings.color}
+        </span>
+
+      </div>
+
+    </div>
+  )}
+
+</div>
 
         </div>
       )}
